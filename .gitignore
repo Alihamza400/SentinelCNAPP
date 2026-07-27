@@ -1,0 +1,49 @@
+# Dependencies
+vendor/
+node_modules/
+.next/
+
+# Build output
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Coverage
+coverage.out
+coverage.html
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Go workspace
+go.work.sum
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Docker
+.docker/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+
+# Logs
+*.log
+/logs/
+
+# Temp
+/tmp/

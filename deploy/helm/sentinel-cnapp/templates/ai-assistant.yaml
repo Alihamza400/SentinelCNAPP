@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sentinel-cnapp.fullname" . }}-ai-assistant
+spec:
+  replicas: {{ .Values.aiAssistant.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: ai-assistant
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: ai-assistant
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      containers:
+        - name: ai-assistant
+          image: "{{ .Values.aiAssistant.image.repository }}:{{ .Values.aiAssistant.image.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: SENTINEL_SERVICE_NAME
+              value: "sentinel-ai-assistant"
+            - name: SENTINEL_SERVICE_PORT
+              value: "8080"
+            - name: SENTINEL_NEO4J_URI
+              value: "bolt://{{ .Release.Name }}-neo4j:7687"
+            - name: SENTINEL_NEO4J_USER
+              value: "neo4j"
+            - name: SENTINEL_NEO4J_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sentinel-cnapp.fullname" . }}-neo4j
+                  key: password
+            - name: SENTINEL_LLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sentinel-cnapp.fullname" . }}-llm
+                  key: api-key
+                  optional: true
+            - name: SENTINEL_LLM_ENDPOINT
+              value: "{{ .Values.aiAssistant.config.llmEndpoint }}"
+            - name: SENTINEL_LOG_LEVEL
+              value: "{{ .Values.aiAssistant.config.sentinelLogLevel }}"
+          resources: {{ toYaml .Values.aiAssistant.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sentinel-cnapp.fullname" . }}-ai-assistant
+spec:
+  selector:
+    app.kubernetes.io/component: ai-assistant
+  ports:
+    - port: 8080
+      targetPort: http
+      name: http
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "sentinel-cnapp.fullname" . }}-llm
+type: Opaque
+stringData:
+  api-key: "{{ .Values.aiAssistant.config.llmApiKey | default "" }}"

@@ -1,0 +1,108 @@
+syntax = "proto3";
+
+package sentinel.finding.v1;
+
+option go_package = "github.com/sentinel-cnapp/sentinel-cnapp/api/proto/finding/v1;findingv1";
+
+import "google/protobuf/timestamp.proto";
+
+// Finding represents a normalized security finding from any scanner.
+message Finding {
+  // Unique identifier for this finding.
+  string id = 1;
+
+  // Source scanner that generated this finding.
+  // Examples: "trivy", "checkov", "gitleaks", "falco".
+  string source = 2;
+
+  // Type of finding.
+  // Examples: "vulnerability", "misconfiguration", "secret", "runtime_alert".
+  string type = 3;
+
+  // Severity level.
+  enum Severity {
+    SEVERITY_UNSPECIFIED = 0;
+    SEVERITY_INFO = 1;
+    SEVERITY_LOW = 2;
+    SEVERITY_MEDIUM = 3;
+    SEVERITY_HIGH = 4;
+    SEVERITY_CRITICAL = 5;
+  }
+  Severity severity = 4;
+
+  // CVSS score if applicable (0.0 - 10.0).
+  double cvss_score = 5;
+
+  // The asset this finding is associated with (ARN, image digest, etc.).
+  string asset_id = 6;
+
+  // Human-readable title.
+  string title = 7;
+
+  // Detailed description.
+  string description = 8;
+
+  // Remediation guidance.
+  string remediation = 9;
+
+  // Engine-specific metadata as key-value pairs.
+  map<string, string> metadata = 10;
+
+  // Version of the detector that found this.
+  string detector_version = 11;
+
+  // When the finding was detected.
+  google.protobuf.Timestamp detected_at = 12;
+
+  // Tags for filtering and organization.
+  repeated string tags = 13;
+
+  // Current status of the finding.
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_OPEN = 1;
+    STATUS_TRIAGED = 2;
+    STATUS_IN_PROGRESS = 3;
+    STATUS_RESOLVED = 4;
+    STATUS_FALSE_POSITIVE = 5;
+    STATUS_SUPPRESSED = 6;
+  }
+  Status status = 14;
+
+  // Team or user responsible for this finding.
+  string owner = 15;
+
+  // External references (CVE IDs, CIS IDs, etc.).
+  repeated string references = 16;
+
+  // Contextual risk score computed by the risk engine (0.0 - 10.0).
+  double risk_score = 17;
+}
+
+// ScanResult wraps one or more findings from a single scan execution.
+message ScanResult {
+  // Unique scan execution ID.
+  string scan_id = 1;
+
+  // Source scanner.
+  string source = 2;
+
+  // When the scan started.
+  google.protobuf.Timestamp started_at = 3;
+
+  // When the scan completed.
+  google.protobuf.Timestamp completed_at = 4;
+
+  // Target that was scanned (repo URL, image tag, cluster name).
+  string target = 5;
+
+  // All findings from this scan.
+  repeated Finding findings = 6;
+
+  // Summary counts.
+  int32 total_findings = 7;
+  int32 critical_count = 8;
+  int32 high_count = 9;
+  int32 medium_count = 10;
+  int32 low_count = 11;
+}

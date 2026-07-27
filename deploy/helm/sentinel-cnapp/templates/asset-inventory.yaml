@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sentinel-cnapp.fullname" . }}-asset-inventory
+  labels:
+    app.kubernetes.io/component: asset-inventory
+spec:
+  replicas: {{ .Values.assetInventory.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: asset-inventory
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: asset-inventory
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      serviceAccountName: {{ include "sentinel-cnapp.fullname" . }}-asset-inventory
+      containers:
+        - name: asset-inventory
+          image: "{{ .Values.assetInventory.image.repository }}:{{ .Values.assetInventory.image.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: SENTINEL_SERVICE_NAME
+              value: "sentinel-asset-inventory"
+            - name: SENTINEL_SERVICE_PORT
+              value: "8080"
+            - name: SENTINEL_POSTGRES_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sentinel-cnapp.fullname" . }}-postgres
+                  key: url
+            - name: SENTINEL_AWS_REGION
+              value: "{{ .Values.assetInventory.config.sentinelAwsRegions | first }}"
+            - name: SENTINEL_AWS_REGIONS
+              value: "{{ .Values.assetInventory.config.sentinelAwsRegions }}"
+            - name: SENTINEL_SYNC_INTERVAL
+              value: "{{ .Values.assetInventory.config.sentinelSyncInterval }}"
+            - name: SENTINEL_LOG_LEVEL
+              value: "{{ .Values.assetInventory.config.sentinelLogLevel }}"
+          resources:
+            {{- toYaml .Values.assetInventory.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sentinel-cnapp.fullname" . }}-asset-inventory
+  labels:
+    app.kubernetes.io/component: asset-inventory
+spec:
+  selector:
+    app.kubernetes.io/component: asset-inventory
+  ports:
+    - port: {{ .Values.assetInventory.service.port }}
+      targetPort: http
+      name: http
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "sentinel-cnapp.fullname" . }}-asset-inventory
+  annotations:
+    eks.amazonaws.com/role-arn: "{{ .Values.assetInventory.iamRoleARN }}"
+---
+{{- if .Values.assetInventory.iamRoleARN }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "sentinel-cnapp.fullname" . }}-asset-inventory
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "sentinel-cnapp.fullname" . }}-asset-inventory
+    namespace: {{ .Release.Namespace }}
+{{- end }}

@@ -1,0 +1,111 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sentinel-cnapp.fullname" . }}-dex
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dex
+  template:
+    metadata:
+      labels:
+        app: dex
+    spec:
+      containers:
+        - name: dex
+          image: "{{ .Values.auth.dex.image.repository }}:{{ .Values.auth.dex.image.tag }}"
+          args:
+            - dex
+            - serve
+            - /etc/dex/config.yaml
+          ports:
+            - containerPort: 5556
+              name: http
+            - containerPort: 5557
+              name: grpc
+          env:
+            - name: DEX_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sentinel-cnapp.fullname" . }}-dex
+                  key: client-secret
+            - name: DEX_GITHUB_CLIENT_ID
+              value: ""
+            - name: DEX_GITHUB_CLIENT_SECRET
+              value: ""
+          volumeMounts:
+            - name: config
+              mountPath: /etc/dex
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "sentinel-cnapp.fullname" . }}-dex
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sentinel-cnapp.fullname" . }}-dex
+spec:
+  selector:
+    app: dex
+  ports:
+    - name: http
+      port: 5556
+      targetPort: 5556
+    - name: grpc
+      port: 5557
+      targetPort: 5557
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "sentinel-cnapp.fullname" . }}-dex
+data:
+  config.yaml: |
+    issuer: http://{{ .Release.Name }}-dex:5556/dex
+    storage:
+      type: kubernetes
+      config:
+        inCluster: true
+    web:
+      http: 0.0.0.0:5556
+    grpc:
+      addr: 0.0.0.0:5557
+    oauth2:
+      skipApprovalScreen: true
+    staticClients:
+      - id: sentinel-cnapp
+        name: SentinelCNAPP
+        secretEnv: DEX_CLIENT_SECRET
+        redirectURIs:
+          - "http://localhost:3000/auth/callback"
+    connectors:
+      - type: local
+        id: local
+        name: Local
+    enablePasswordDB: true
+    staticPasswords:
+      - email: admin@sentinel-cnapp.io
+        hash: "$2a$10$2b2cU8CPhOTaGgw1n5xG9u5F2rF5qF5qF5qF5qF5qF5qF5qF5qF5q"
+        username: admin
+        userID: "08a8684b-db88-4b73-90a9-3cd1661f5466"
+      - email: viewer@sentinel-cnapp.io
+        hash: "$2a$10$2b2cU8CPhOTaGgw1n5xG9u5F2rF5qF5qF5qF5qF5qF5qF5qF5qF5q"
+        username: viewer
+        userID: "18a8684b-db88-4b73-90a9-3cd1661f5466"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "sentinel-cnapp.fullname" . }}-dex
+type: Opaque
+stringData:
+  client-secret: "{{ .Values.auth.dex.clientSecret }}"

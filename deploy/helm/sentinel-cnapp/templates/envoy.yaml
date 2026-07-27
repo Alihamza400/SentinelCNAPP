@@ -1,0 +1,229 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sentinel-cnapp.fullname" . }}-envoy
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: envoy
+  template:
+    metadata:
+      labels:
+        app: envoy
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9901"
+    spec:
+      containers:
+        - name: envoy
+          image: "{{ .Values.auth.envoy.image.repository }}:{{ .Values.auth.envoy.image.tag }}"
+          ports:
+            - containerPort: 8080
+              name: http
+            - containerPort: 9901
+              name: admin
+          volumeMounts:
+            - name: config
+              mountPath: /etc/envoy
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "sentinel-cnapp.fullname" . }}-envoy
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sentinel-cnapp.fullname" . }}-envoy
+spec:
+  type: {{ .Values.auth.envoy.service.type }}
+  selector:
+    app: envoy
+  ports:
+    - name: http
+      port: {{ .Values.auth.envoy.service.port }}
+      targetPort: 8080
+    - name: admin
+      port: 9901
+      targetPort: 9901
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "sentinel-cnapp.fullname" . }}-envoy
+data:
+  envoy.yaml: |
+    static_resources:
+      listeners:
+        - name: public_listener
+          address:
+            socket_address:
+              address: 0.0.0.0
+              port_value: 8080
+          filter_chains:
+            - filters:
+                - name: envoy.filters.network.http_connection_manager
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                    stat_prefix: ingress_http
+                    codec_type: AUTO
+                    route_specifier:
+                      route_config_name: local_route
+                    http_filters:
+                      - name: envoy.filters.http.router
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+      routes:
+        - name: local_route
+          virtual_hosts:
+            - name: backend
+              domains: ["*"]
+              routes:
+                - match:
+                    prefix: /api/v1/assets
+                  route:
+                    cluster: asset-inventory
+                    timeout: 30s
+                - match:
+                    prefix: /health
+                  route:
+                    cluster: asset-inventory
+                    timeout: 5s
+                - match:
+                    prefix: /metrics
+                  route:
+                    cluster: asset-inventory
+                    timeout: 5s
+                - match:
+                    prefix: /api/v1/findings
+                  route:
+                    cluster: correlation
+                    timeout: 30s
+                - match:
+                    prefix: /api/v1/dashboard
+                  route:
+                    cluster: correlation
+                    timeout: 10s
+                - match:
+                    prefix: /api/v1/graph
+                  route:
+                    cluster: correlation
+                    timeout: 10s
+                - match:
+                    prefix: /api/v1/attack-paths
+                  route:
+                    cluster: attack-path
+                    timeout: 30s
+                - match:
+                    prefix: /api/v1/risk
+                  route:
+                    cluster: risk-engine
+                    timeout: 30s
+                - match:
+                    prefix: /api/v1/remediation
+                  route:
+                    cluster: remediation
+                    timeout: 60s
+                - match:
+                    prefix: /api/v1/ai
+                  route:
+                    cluster: ai-assistant
+                    timeout: 60s
+      clusters:
+        - name: asset-inventory
+          connect_timeout: 5s
+          type: STRICT_DNS
+          lb_policy: ROUND_ROBIN
+          load_assignment:
+            cluster_name: asset-inventory
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: {{ .Release.Name }}-asset-inventory
+                          port_value: 8080
+        - name: correlation
+          connect_timeout: 5s
+          type: STRICT_DNS
+          lb_policy: ROUND_ROBIN
+          load_assignment:
+            cluster_name: correlation
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: {{ .Release.Name }}-correlation
+                          port_value: 8080
+        - name: risk-engine
+          connect_timeout: 5s
+          type: STRICT_DNS
+          lb_policy: ROUND_ROBIN
+          load_assignment:
+            cluster_name: risk-engine
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: {{ .Release.Name }}-risk-engine
+                          port_value: 8080
+        - name: attack-path
+          connect_timeout: 5s
+          type: STRICT_DNS
+          lb_policy: ROUND_ROBIN
+          load_assignment:
+            cluster_name: attack-path
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: {{ .Release.Name }}-attack-path
+                          port_value: 8080
+        - name: remediation
+          connect_timeout: 5s
+          type: STRICT_DNS
+          lb_policy: ROUND_ROBIN
+          load_assignment:
+            cluster_name: remediation
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: {{ .Release.Name }}-remediation
+                          port_value: 8080
+        - name: ai-assistant
+          connect_timeout: 5s
+          type: STRICT_DNS
+          lb_policy: ROUND_ROBIN
+          load_assignment:
+            cluster_name: ai-assistant
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: {{ .Release.Name }}-ai-assistant
+                          port_value: 8080
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: {{ .Release.Name }}-attack-path
+                          port_value: 8080
+    admin:
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 9901

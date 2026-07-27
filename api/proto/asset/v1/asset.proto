@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package sentinel.asset.v1;
+
+option go_package = "github.com/sentinel-cnapp/sentinel-cnapp/api/proto/asset/v1;assetv1";
+
+import "google/protobuf/timestamp.proto";
+
+// Asset represents a cloud or infrastructure resource.
+message Asset {
+  // Unique identifier (ARN, UID, or generated ID).
+  string id = 1;
+
+  // Cloud provider: "aws", "azure", "gcp", "kubernetes", "github".
+  string provider = 2;
+
+  // Asset type: "ec2", "s3_bucket", "iam_role", "eks_cluster", "lambda", etc.
+  string type = 3;
+
+  // Human-readable name.
+  string name = 4;
+
+  // Region or location.
+  string region = 5;
+
+  // Resource tags.
+  map<string, string> tags = 6;
+
+  // Whether this asset is internet-facing.
+  bool internet_facing = 7;
+
+  // Data classification: "public", "internal", "confidential", "restricted".
+  string data_classification = 8;
+
+  // Environment: "production", "staging", "development", "test".
+  string environment = 9;
+
+  // JSON-encoded provider-specific metadata.
+  string metadata_json = 10;
+
+  // When the asset was discovered.
+  google.protobuf.Timestamp discovered_at = 11;
+
+  // When the asset was last synced.
+  google.protobuf.Timestamp last_synced_at = 12;
+
+  // Whether the asset is currently active.
+  bool active = 13;
+}
+
+// AssetRelationship describes a connection between two assets.
+message AssetRelationship {
+  string source_asset_id = 1;
+  string target_asset_id = 2;
+  string relationship_type = 3;  // "HAS_IDENTITY", "DEPENDS_ON", "CONNECTS_TO", "MANAGES"
+  map<string, string> properties = 4;
+}

@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sentinel-cnapp.fullname" . }}-correlation
+spec:
+  replicas: {{ .Values.correlation.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: correlation
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: correlation
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      containers:
+        - name: correlation
+          image: "{{ .Values.correlation.image.repository }}:{{ .Values.correlation.image.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: SENTINEL_SERVICE_NAME
+              value: "sentinel-correlation"
+            - name: SENTINEL_SERVICE_PORT
+              value: "8080"
+            - name: SENTINEL_NEO4J_URI
+              value: "bolt://{{ .Release.Name }}-neo4j:7687"
+            - name: SENTINEL_NEO4J_USER
+              value: "neo4j"
+            - name: SENTINEL_NEO4J_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sentinel-cnapp.fullname" . }}-neo4j
+                  key: password
+            - name: SENTINEL_NATS_URL
+              value: "nats://{{ .Release.Name }}-nats:4222"
+            - name: SENTINEL_REDIS_URL
+              value: "{{ .Release.Name }}-redis-master:6379"
+            - name: SENTINEL_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "sentinel-cnapp.fullname" . }}-redis
+                  key: password
+            - name: SENTINEL_LOG_LEVEL
+              value: "{{ .Values.correlation.config.sentinelLogLevel }}"
+          resources: {{ toYaml .Values.correlation.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sentinel-cnapp.fullname" . }}-correlation
+spec:
+  selector:
+    app.kubernetes.io/component: correlation
+  ports:
+    - port: 8080
+      targetPort: http
+      name: http
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "sentinel-cnapp.fullname" . }}-neo4j
+type: Opaque
+stringData:
+  password: "{{ .Values.neo4j.auth.neo4jPassword | default "changeme" }}"

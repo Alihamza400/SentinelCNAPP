@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package sentinel.common.v1;
+
+option go_package = "github.com/sentinel-cnapp/sentinel-cnapp/api/proto/common/v1;commonv1";
+
+import "google/protobuf/timestamp.proto";
+
+// Pagination request parameters.
+message PaginationRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  string cursor = 3;
+}
+
+// Pagination response metadata.
+message PaginationResponse {
+  int32 total = 1;
+  int32 page = 2;
+  int32 page_size = 3;
+  string next_cursor = 4;
+  bool has_more = 5;
+}
+
+// Standard filter parameters.
+message Filter {
+  string field = 1;
+  string operator = 2;  // "eq", "neq", "gt", "gte", "lt", "lte", "contains", "in"
+  repeated string values = 3;
+}
+
+// Sort parameters.
+message Sort {
+  string field = 1;
+  enum Order {
+    ORDER_UNSPECIFIED = 0;
+    ORDER_ASC = 1;
+    ORDER_DESC = 2;
+  }
+  Order order = 2;
+}
+
+// Health check response.
+message HealthCheckResponse {
+  string status = 1;
+  string version = 2;
+  string uptime = 3;
+  map<string, string> dependencies = 4;
+}

@@ -1,0 +1,51 @@
+# https://gitleaks.io
+title = "SentinelCNAPP Gitleaks Config"
+
+[rules]
+  [rules.aws-access-token]
+    description = "AWS Access Token"
+    regex = '''(?:AKIA|ASIA)[A-Z0-9]{16}'''
+    tags = ["aws", "credentials"]
+
+  [rules.aws-secret-key]
+    description = "AWS Secret Key"
+    regex = '''(?i)aws(.{0,20})?(?-i)['\"][0-9a-zA-Z\/+]{40}['\"]'''
+    tags = ["aws", "credentials"]
+
+  [rules.github-pat]
+    description = "GitHub Personal Access Token"
+    regex = '''ghp_[0-9a-zA-Z]{36}'''
+    tags = ["github", "credentials"]
+
+  [rules.github-oauth]
+    description = "GitHub OAuth Access Token"
+    regex = '''gho_[0-9a-zA-Z]{36}'''
+    tags = ["github", "credentials"]
+
+  [rules.gitlab-pat]
+    description = "GitLab Personal Access Token"
+    regex = '''glpat-[0-9a-zA-Z\-]{20}'''
+    tags = ["gitlab", "credentials"]
+
+  [rules.google-api-key]
+    description = "Google API Key"
+    regex = '''AIza[0-9A-Za-z\-_]{35}'''
+    tags = ["google", "api-key"]
+
+  [rules.slack-token]
+    description = "Slack Token"
+    regex = '''xox[baprs]-[0-9a-zA-Z\-]{10,72}'''
+    tags = ["slack", "credentials"]
+
+  [rules.private-key]
+    description = "Private Key"
+    regex = '''-----BEGIN\s?(RSA|OPENSSH|DSA|EC|PGP)?\s?PRIVATE\s?KEY-----'''
+    tags = ["private-key", "credentials"]
+
+[allowlist]
+  description = "Allowlisted files"
+  files = [
+    "(go.mod|go.sum)$",
+    ".*_test.go$",
+    "package-lock.json$",
+  ]

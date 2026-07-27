@@ -1,0 +1,272 @@
+# SentinelCNAPP Helm Values
+# Global configuration for all services
+
+global:
+  environment: production
+  imageRegistry: ghcr.io/sentinel-cnapp
+  imagePullPolicy: IfNotPresent
+  webhookSecret: "changeme-webhook-secret"
+
+# ── PostgreSQL ──────────────────────────────────
+postgresql:
+  enabled: true
+  auth:
+    database: sentinel
+    username: sentinel
+    password: changeme
+    postgresPassword: changeme
+  primary:
+    persistence:
+      size: 10Gi
+
+# ── Redis ──────────────────────────────────────
+redis:
+  enabled: true
+  auth:
+    password: changeme
+  architecture: standalone
+  master:
+    persistence:
+      size: 5Gi
+
+# ── Neo4j ──────────────────────────────────────
+neo4j:
+  enabled: true
+  auth:
+    neo4jPassword: changeme
+  core:
+    persistence:
+      size: 10Gi
+
+# ── NATS ───────────────────────────────────────
+nats:
+  enabled: true
+  config:
+    jetstream:
+      enabled: true
+      fileStore:
+        dir: /data
+
+# ── Asset Inventory ────────────────────────────
+assetInventory:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: asset-inventory
+    tag: latest
+  service:
+    port: 8080
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  config:
+    sentinelAwsRegions: "us-east-1,us-west-2,eu-west-1"
+    sentinelSyncInterval: "15m"
+    sentinelLogLevel: "info"
+
+# ── Correlation ────────────────────────────────
+correlation:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: correlation
+    tag: latest
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  config:
+    sentinelLogLevel: "info"
+
+# ── Auth ───────────────────────────────────────
+auth:
+  enabled: true
+  dex:
+    image:
+      repository: ghcr.io/dexidp/dex
+      tag: v2.38.0
+    clientSecret: sentinel-cnapp-secret
+  envoy:
+    image:
+      repository: envoyproxy/envoy
+      tag: v1.30-latest
+    service:
+      port: 8080
+      type: ClusterIP
+  extAuthz:
+    image:
+      repository: sentinel-cnapp/ext-authz
+      tag: latest
+
+# ── Scanner: IaC (Checkov) ─────────────────────
+scannerIac:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: scanner-iac
+    tag: latest
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  config:
+    sentinelLogLevel: "info"
+
+# ── Scanner: Container (Trivy) ─────────────────
+scannerContainer:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: scanner-container
+    tag: latest
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+  config:
+    sentinelLogLevel: "info"
+
+# ── Scanner: K8s (Trivy + Custom) ──────────────
+scannerK8s:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: scanner-k8s
+    tag: latest
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  config:
+    sentinelLogLevel: "info"
+
+# ── Scanner: Secrets (Gitleaks) ────────────────
+scannerSecrets:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: scanner-secrets
+    tag: latest
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  config:
+    sentinelLogLevel: "info"
+
+# ── Risk Engine ────────────────────────────────
+riskEngine:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: risk-engine
+    tag: latest
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  config:
+    sentinelLogLevel: "info"
+
+# ── Attack Path Engine ─────────────────────────
+attackPath:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: attack-path
+    tag: latest
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  config:
+    sentinelLogLevel: "info"
+
+# ── Runtime Protection ─────────────────────────
+runtime:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: runtime
+    tag: latest
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  config:
+    sentinelLogLevel: "info"
+
+# ── Remediation ────────────────────────────────
+remediation:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: remediation
+    tag: latest
+  iamRoleARN: ""
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  config:
+    sentinelLogLevel: "info"
+    awsRegion: "us-east-1"
+
+# ── AI Assistant ───────────────────────────────
+aiAssistant:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ai-assistant
+    tag: latest
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  config:
+    sentinelLogLevel: "info"
+    llmEndpoint: "https://api.openai.com/v1/chat/completions"
+    llmApiKey: ""
+
+# ── Ingress ────────────────────────────────────
+ingress:
+  enabled: false
+  className: nginx
+  host: dashboard.sentinel-cnapp.io
+  tls:
+    enabled: false
+    secretName: sentinel-cnapp-tls

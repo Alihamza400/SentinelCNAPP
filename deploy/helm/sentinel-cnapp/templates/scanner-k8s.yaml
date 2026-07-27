@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sentinel-cnapp.fullname" . }}-scanner-k8s
+spec:
+  replicas: {{ .Values.scannerK8s.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: scanner-k8s
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: scanner-k8s
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      serviceAccountName: {{ include "sentinel-cnapp.fullname" . }}-scanner-k8s
+      containers:
+        - name: scanner-k8s
+          image: "{{ .Values.scannerK8s.image.repository }}:{{ .Values.scannerK8s.image.tag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: SENTINEL_SERVICE_NAME
+              value: "sentinel-scanner-k8s"
+            - name: SENTINEL_SERVICE_PORT
+              value: "8080"
+            - name: SENTINEL_NATS_URL
+              value: "nats://{{ .Release.Name }}-nats:4222"
+            - name: SENTINEL_LOG_LEVEL
+              value: "{{ .Values.scannerK8s.config.sentinelLogLevel }}"
+          resources: {{ toYaml .Values.scannerK8s.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sentinel-cnapp.fullname" . }}-scanner-k8s
+spec:
+  selector:
+    app.kubernetes.io/component: scanner-k8s
+  ports:
+    - port: 8080
+      targetPort: http
+      name: http
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "sentinel-cnapp.fullname" . }}-scanner-k8s
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "sentinel-cnapp.fullname" . }}-scanner-k8s
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "namespaces", "nodes", "resourcequotas"]
+    verbs: ["get", "list"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "daemonsets"]
+    verbs: ["get", "list"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+    verbs: ["get", "list"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list"]
+  - apiGroups: ["policy"]
+    resources: ["podsecuritypolicies", "poddisruptionbudgets"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "sentinel-cnapp.fullname" . }}-scanner-k8s
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "sentinel-cnapp.fullname" . }}-scanner-k8s
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "sentinel-cnapp.fullname" . }}-scanner-k8s
+    namespace: {{ .Release.Namespace }}

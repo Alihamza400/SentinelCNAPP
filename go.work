@@ -1,0 +1,19 @@
+go 1.22.0
+
+use (
+	.
+	./services/asset-inventory
+	./services/scanner-iac
+	./services/scanner-container
+	./services/scanner-k8s
+	./services/scanner-secrets
+	./services/correlation
+	./services/risk-engine
+	./services/attack-path
+	./services/cspm
+	./services/ciem
+	./services/compliance
+	./services/runtime
+	./services/remediation
+	./services/ai-assistant
+)
