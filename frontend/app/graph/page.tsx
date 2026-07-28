@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuth } from '@/components/auth-provider';
+import { API_URL } from '@/lib/config';
 import { Share2, ZoomIn, ZoomOut, RotateCw } from 'lucide-react';
 
 interface GraphNode {
@@ -87,7 +88,7 @@ export default function GraphPage() {
       setLoading(true);
       try {
         const token = localStorage.getItem('sentinel_token');
-        const res = await fetch('http://localhost:8080/api/v1/graph?limit=200', {
+        const res = await fetch(`${API_URL}/api/v1/graph?limit=200`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 

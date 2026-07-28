@@ -59,8 +59,8 @@ func run(ctx context.Context) error {
 	log.Info("connected to neo4j", "uri", neo4jURI)
 
 	// ── LLM Config (optional) ──────────────────────────────
-	llmAPIKey := cfg.GetDefault("SENTINEL_LLM_API_KEY", "")
-	llmEndpoint := cfg.GetDefault("SENTINEL_LLM_ENDPOINT", "")
+	llmAPIKey := cfg.GetDefault(config.LLMApiKey, "")
+	llmEndpoint := cfg.GetDefault(config.LLMEndpoint, "")
 
 	// ── AI Query Engine ────────────────────────────────────
 	eng := engine.New(graphClient, log, llmAPIKey, llmEndpoint)

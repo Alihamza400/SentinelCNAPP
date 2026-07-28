@@ -1,5 +1,3 @@
-import { useAuth } from '@/components/auth-provider';
-
 interface Asset {
   id: string;
   provider: string;
@@ -21,7 +19,7 @@ interface ListAssetsResponse {
   page_size: number;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8081';
 
 export class APIError extends Error {
   constructor(public status: number, message: string) {

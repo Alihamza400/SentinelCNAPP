@@ -13,6 +13,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/lambda v1.54.0
 	github.com/aws/aws-sdk-go-v2/service/ecr v1.28.0
 	github.com/aws/aws-sdk-go-v2/service/rds v1.78.0
+	github.com/aws/aws-sdk-go-v2/service/sts v1.28.0
 )
 
 replace github.com/sentinel-cnapp/sentinel-cnapp => ../..

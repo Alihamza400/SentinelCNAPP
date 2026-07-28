@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/components/auth-provider';
+import { API_URL } from '@/lib/config';
 import { Bot, Send, Database, Clock, AlertCircle, Sparkles } from 'lucide-react';
 
 interface QueryResult {
@@ -60,7 +61,7 @@ export default function AIAssistantPage() {
   const fetchTemplates = async () => {
     const token = localStorage.getItem('sentinel_token');
     try {
-      const res = await fetch('http://localhost:8080/api/v1/ai/templates', {
+      const res = await fetch(`${API_URL}/api/v1/ai/templates`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -79,7 +80,7 @@ export default function AIAssistantPage() {
 
     const token = localStorage.getItem('sentinel_token');
     try {
-      const res = await fetch('http://localhost:8080/api/v1/ai/query', {
+      const res = await fetch(`${API_URL}/api/v1/ai/query`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ question }),

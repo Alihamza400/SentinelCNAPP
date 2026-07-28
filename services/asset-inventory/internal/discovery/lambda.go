@@ -52,13 +52,6 @@ func (d *LambdaDiscoverer) functionToAsset(fn lambda.FunctionConfiguration, regi
 	id := fmt.Sprintf("arn:aws:lambda:%s:%s:function:%s", region, d.accountID, *fn.FunctionName)
 	tags := make(map[string]string)
 
-	// Try to get tags
-	_, err := d.client.GetFunction(ctx, &lambda.GetFunctionInput{
-		FunctionName: aws.String(*fn.FunctionArn),
-	})
-	// Note: tags are included in GetFunction response
-	_ = err
-
 	runtime := ""
 	if fn.Runtime != nil {
 		runtime = string(fn.Runtime)

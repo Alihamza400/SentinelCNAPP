@@ -65,7 +65,7 @@ func run(ctx context.Context) error {
 	executor := scanner.NewExecutor(log, scanner.WithTimeout(30*time.Minute))
 
 	// Webhook receiver
-	webhookSecret := cfg.GetDefault("SENTINEL_WEBHOOK_SECRET", "")
+	webhookSecret := cfg.GetDefault(config.WebhookSecret, "")
 	webhook := scanner.NewWebhookReceiver(log, webhookSecret)
 	webhook.RegisterHandler("push", func(ctx context.Context, event *scanner.WebhookEvent) error {
 		return runGitleaksScan(ctx, executor, emitter, log, event.RepoURL, event.CommitSHA)

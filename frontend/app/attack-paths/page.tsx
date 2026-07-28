@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/auth-provider';
+import { API_URL } from '@/lib/config';
 import { Shield, ShieldAlert, ArrowRight,ExternalLink } from 'lucide-react';
 
 interface AttackStep {
@@ -61,7 +62,7 @@ export default function AttackPathsPage() {
       const headers = { Authorization: `Bearer ${token}` };
 
       try {
-        const res = await fetch('http://localhost:8080/api/v1/attack-paths/summary', { headers });
+        const res = await fetch(`${API_URL}/api/v1/attack-paths/summary`, { headers });
         if (res.ok) {
           const data: AttackPathSummary = await res.json();
           setSummary(data);

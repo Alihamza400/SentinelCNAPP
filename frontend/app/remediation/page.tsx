@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/auth-provider';
+import { API_URL } from '@/lib/config';
 import { Shield, CheckCircle2, XCircle, Clock, AlertTriangle } from 'lucide-react';
 
 interface Remediation {
@@ -46,7 +47,7 @@ export default function RemediationPage() {
     const fetchPending = async () => {
       const token = localStorage.getItem('sentinel_token');
       try {
-        const res = await fetch('http://localhost:8080/api/v1/remediation/pending', {
+        const res = await fetch(`${API_URL}/api/v1/remediation/pending`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
@@ -71,7 +72,7 @@ export default function RemediationPage() {
 
     const token = localStorage.getItem('sentinel_token');
     try {
-      const res = await fetch(`http://localhost:8080/api/v1/remediation/approve/${id}`, {
+      const res = await fetch(`${API_URL}/api/v1/remediation/approve/${id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ approved_by: user?.email || 'admin' }),

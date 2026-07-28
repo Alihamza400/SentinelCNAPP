@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/components/auth-provider';
+import { API_URL } from '@/lib/config';
 import { AlertTriangle, Search, Shield, Filter } from 'lucide-react';
 
 interface Finding {
@@ -68,7 +69,7 @@ export default function FindingsPage() {
 
       try {
         const token = localStorage.getItem('sentinel_token');
-        const res = await fetch(`http://localhost:8080/api/v1/findings?${params}`, {
+        const res = await fetch(`${API_URL}/api/v1/findings?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 

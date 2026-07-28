@@ -9,7 +9,6 @@ import (
 
 	"github.com/casbin/casbin/v2"
 	"github.com/casbin/casbin/v2/model"
-	gormadapter "github.com/casbin/casbin/v2/persist"
 	"gopkg.in/yaml.v3"
 )
 

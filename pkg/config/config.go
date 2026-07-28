@@ -158,6 +158,9 @@ const (
 	LLMApiKey    = "SENTINEL_LLM_API_KEY"
 	LLMEndpoint  = "SENTINEL_LLM_ENDPOINT"
 
+	// Webhook
+	WebhookSecret = "SENTINEL_WEBHOOK_SECRET"
+
 	// Logging
 	LogLevel  = "SENTINEL_LOG_LEVEL"
 	LogFormat = "SENTINEL_LOG_FORMAT"

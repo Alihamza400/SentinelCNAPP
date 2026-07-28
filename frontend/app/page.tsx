@@ -4,6 +4,7 @@ import { Cloud, Search, AlertTriangle, Activity, CheckCircle2 } from 'lucide-rea
 import { useAuth } from '@/components/auth-provider';
 import { useEffect, useState } from 'react';
 import { listAssets } from '@/lib/api-client';
+import { API_URL } from '@/lib/config';
 
 interface DashboardStats {
   total_assets: number;
@@ -48,7 +49,7 @@ export default function Dashboard() {
       const headers = { Authorization: `Bearer ${token}` };
 
       try {
-        const res = await fetch('http://localhost:8080/api/v1/dashboard/stats', { headers });
+        const res = await fetch(`${API_URL}/api/v1/dashboard/stats`, { headers });
         if (res.ok) {
           const data: DashboardStats = await res.json();
           setStats(data);
@@ -56,7 +57,7 @@ export default function Dashboard() {
       } catch {}
 
       try {
-        const res = await fetch('http://localhost:8082/api/v1/dashboard/severity-distribution', { headers });
+        const res = await fetch(`${API_URL}/api/v1/dashboard/severity-distribution`, { headers });
         if (res.ok) {
           const data: SeverityDistribution = await res.json();
           setSeverityDist(data);

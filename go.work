@@ -10,9 +10,6 @@ use (
 	./services/correlation
 	./services/risk-engine
 	./services/attack-path
-	./services/cspm
-	./services/ciem
-	./services/compliance
 	./services/runtime
 	./services/remediation
 	./services/ai-assistant
