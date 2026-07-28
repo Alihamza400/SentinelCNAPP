@@ -2,17 +2,22 @@ package auth
 
 import (
 	"context"
+	"crypto/rsa"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"math/big"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/casbin/casbin/v2"
 	"github.com/casbin/casbin/v2/model"
+	"github.com/golang-jwt/jwt/v5"
 	"gopkg.in/yaml.v3"
 )
 
-// RBACModel is the Casbin RBAC model definition.
 const RBACModel = `
 [request_definition]
 r = sub, obj, act
@@ -30,15 +35,11 @@ e = some(where (p.eft == allow))
 m = g(r.sub, p.sub) && keyMatch(r.obj, p.obj) && regexMatch(r.act, p.act)
 `
 
-// Role constants.
 const (
-	RoleAdmin  = "admin"
-	RoleViewer = "viewer"
+	RoleAdmin   = "admin"
+	RoleViewer  = "viewer"
 	RoleScanner = "scanner"
-)
 
-// Permission constants.
-const (
 	ActionRead   = "read"
 	ActionWrite  = "write"
 	ActionDelete = "delete"
@@ -46,12 +47,10 @@ const (
 	ActionAdmin  = "admin"
 )
 
-// Enforcer wraps Casbin for RBAC enforcement.
 type Enforcer struct {
 	enforcer *casbin.Enforcer
 }
 
-// NewEnforcer creates a new RBAC enforcer.
 func NewEnforcer(policies []Policy) (*Enforcer, error) {
 	m, err := model.NewModelFromString(RBACModel)
 	if err != nil {
@@ -63,33 +62,28 @@ func NewEnforcer(policies []Policy) (*Enforcer, error) {
 		return nil, fmt.Errorf("creating casbin enforcer: %w", err)
 	}
 
-	// Add default role assignments
 	for _, p := range policies {
 		if _, err := e.AddPolicy(p.Subject, p.Object, p.Action); err != nil {
 			return nil, fmt.Errorf("adding policy: %w", err)
 		}
 	}
 
-	// Add role inheritance
 	e.AddGroupingPolicy("viewer", "scanner")
 	e.AddGroupingPolicy("scanner", "admin")
 
 	return &Enforcer{enforcer: e}, nil
 }
 
-// Policy defines a Casbin policy rule.
 type Policy struct {
-	Subject string `yaml:"subject"` // role or user
-	Object  string `yaml:"object"`  // resource pattern
-	Action  string `yaml:"action"`  // action pattern
+	Subject string `yaml:"subject"`
+	Object  string `yaml:"object"`
+	Action  string `yaml:"action"`
 }
 
-// PolicyFile defines the structure of a policy YAML file.
 type PolicyFile struct {
 	Policies []Policy `yaml:"policies"`
 }
 
-// LoadPoliciesFromYAML loads policies from a YAML file.
 func LoadPoliciesFromYAML(data []byte) ([]Policy, error) {
 	var pf PolicyFile
 	if err := yaml.Unmarshal(data, &pf); err != nil {
@@ -98,14 +92,10 @@ func LoadPoliciesFromYAML(data []byte) ([]Policy, error) {
 	return pf.Policies, nil
 }
 
-// DefaultPolicies returns the default RBAC policies.
 func DefaultPolicies() []Policy {
 	return []Policy{
-		// Admin has full access
 		{Subject: RoleAdmin, Object: "/*", Action: ".*"},
-		// Viewer can read everything
 		{Subject: RoleViewer, Object: "/*", Action: "read"},
-		// Scanner can read assets and write findings
 		{Subject: RoleScanner, Object: "/assets/*", Action: "read"},
 		{Subject: RoleScanner, Object: "/findings", Action: "write"},
 		{Subject: RoleScanner, Object: "/findings/*", Action: "write"},
@@ -113,12 +103,10 @@ func DefaultPolicies() []Policy {
 	}
 }
 
-// Authorize checks if a subject (user/role) is allowed to perform an action on an object.
 func (e *Enforcer) Authorize(subject, object, action string) (bool, error) {
 	return e.enforcer.Enforce(subject, object, action)
 }
 
-// Middleware returns an HTTP middleware that enforces RBAC.
 func (e *Enforcer) Middleware(extractSubject func(r *http.Request) string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -155,7 +143,6 @@ func mapMethodToAction(method string) string {
 	}
 }
 
-// User represents an authenticated user.
 type User struct {
 	ID        string    `json:"id"`
 	Email     string    `json:"email"`
@@ -165,7 +152,6 @@ type User struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// HasRole checks if the user has a specific role.
 func (u *User) HasRole(role string) bool {
 	for _, r := range u.Roles {
 		if r == role {
@@ -175,7 +161,6 @@ func (u *User) HasRole(role string) bool {
 	return false
 }
 
-// TokenClaims represents JWT token claims.
 type TokenClaims struct {
 	Subject string   `json:"sub"`
 	Email   string   `json:"email"`
@@ -185,18 +170,292 @@ type TokenClaims struct {
 	Exp     int64    `json:"exp"`
 }
 
-// ValidateToken validates a JWT token and returns the claims.
-// This is a stub — production should use OIDC verification.
-func ValidateToken(tokenString string) (*TokenClaims, error) {
-	// TODO: Implement OIDC JWT validation
-	// This is replaced with real OIDC verification in Phase 1
+func (c *TokenClaims) GetExpirationTime() (*jwt.NumericDate, error) {
+	if c.Exp == 0 {
+		return nil, nil
+	}
+	return jwt.NewNumericDate(time.Unix(c.Exp, 0)), nil
+}
+
+func (c *TokenClaims) GetIssuedAt() (*jwt.NumericDate, error) {
+	return nil, nil
+}
+
+func (c *TokenClaims) GetNotBefore() (*jwt.NumericDate, error) {
+	return nil, nil
+}
+
+func (c *TokenClaims) GetIssuer() string {
+	return ""
+}
+
+func (c *TokenClaims) GetSubject() string {
+	return c.Subject
+}
+
+func (c *TokenClaims) GetAudience() jwt.ClaimStrings {
+	return nil
+}
+
+type oidcConfigResponse struct {
+	Issuer  string `json:"issuer"`
+	JWKSURI string `json:"jwks_uri"`
+}
+
+type jwkKey struct {
+	Kty string `json:"kty"`
+	Kid string `json:"kid"`
+	Alg string `json:"alg"`
+	N   string `json:"n"`
+	E   string `json:"e"`
+	Use string `json:"use"`
+}
+
+type jwksResponse struct {
+	Keys []jwkKey `json:"keys"`
+}
+
+type OIDCValidator struct {
+	issuerURL string
+	clientID  string
+	jwksURI   string
+
+	mu          sync.RWMutex
+	publicKeys  map[string]*rsa.PublicKey
+	lastRefresh time.Time
+	httpClient  *http.Client
+}
+
+var (
+	defaultValidator     *OIDCValidator
+	defaultValidatorMu   sync.Mutex
+)
+
+func NewOIDCValidator(issuerURL, clientID string) (*OIDCValidator, error) {
+	v := &OIDCValidator{
+		issuerURL:  strings.TrimRight(issuerURL, "/"),
+		clientID:   clientID,
+		publicKeys: make(map[string]*rsa.PublicKey),
+		httpClient: &http.Client{Timeout: 10 * time.Second},
+	}
+
+	if err := v.refreshJWKS(); err != nil {
+		return nil, fmt.Errorf("fetching OIDC configuration: %w", err)
+	}
+
+	return v, nil
+}
+
+func InitDefaultValidator(issuerURL, clientID string) (*OIDCValidator, error) {
+	defaultValidatorMu.Lock()
+	defer defaultValidatorMu.Unlock()
+
+	v, err := NewOIDCValidator(issuerURL, clientID)
+	if err != nil {
+		return nil, err
+	}
+
+	defaultValidator = v
+	return v, nil
+}
+
+func (v *OIDCValidator) refreshJWKS() error {
+	if v.jwksURI == "" {
+		wellKnown := v.issuerURL + "/.well-known/openid-configuration"
+		req, err := http.NewRequestWithContext(context.Background(), "GET", wellKnown, nil)
+		if err != nil {
+			return fmt.Errorf("creating request: %w", err)
+		}
+
+		resp, err := v.httpClient.Do(req)
+		if err != nil {
+			return fmt.Errorf("fetching OIDC config: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("OIDC config returned status %d", resp.StatusCode)
+		}
+
+		var oidcCfg oidcConfigResponse
+		if err := json.NewDecoder(resp.Body).Decode(&oidcCfg); err != nil {
+			return fmt.Errorf("decoding OIDC config: %w", err)
+		}
+
+		v.jwksURI = oidcCfg.JWKSURI
+	}
+
+	req, err := http.NewRequestWithContext(context.Background(), "GET", v.jwksURI, nil)
+	if err != nil {
+		return fmt.Errorf("creating JWKS request: %w", err)
+	}
+
+	resp, err := v.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("fetching JWKS: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("JWKS returned status %d", resp.StatusCode)
+	}
+
+	var jwks jwksResponse
+	if err := json.NewDecoder(resp.Body).Decode(&jwks); err != nil {
+		return fmt.Errorf("decoding JWKS: %w", err)
+	}
+
+	keys := make(map[string]*rsa.PublicKey, len(jwks.Keys))
+	for _, k := range jwks.Keys {
+		if k.Kty != "RSA" || k.Use != "sig" {
+			continue
+		}
+
+		nBytes, err := base64.RawURLEncoding.DecodeString(k.N)
+		if err != nil {
+			continue
+		}
+		eBytes, err := base64.RawURLEncoding.DecodeString(k.E)
+		if err != nil {
+			continue
+		}
+
+		n := new(big.Int).SetBytes(nBytes)
+		e := int(new(big.Int).SetBytes(eBytes).Int64())
+
+		keys[k.Kid] = &rsa.PublicKey{N: n, E: e}
+	}
+
+	v.mu.Lock()
+	v.publicKeys = keys
+	v.lastRefresh = time.Now()
+	v.mu.Unlock()
+
+	return nil
+}
+
+func (v *OIDCValidator) getKey(kid string) (*rsa.PublicKey, error) {
+	v.mu.RLock()
+	key, ok := v.publicKeys[kid]
+	v.mu.RUnlock()
+
+	if ok {
+		return key, nil
+	}
+
+	if err := v.refreshJWKS(); err != nil {
+		return nil, err
+	}
+
+	v.mu.RLock()
+	key, ok = v.publicKeys[kid]
+	v.mu.RUnlock()
+
+	if !ok {
+		return nil, fmt.Errorf("key %q not found in JWKS", kid)
+	}
+
+	return key, nil
+}
+
+func (v *OIDCValidator) ValidateToken(tokenString string) (*TokenClaims, error) {
 	if tokenString == "" {
 		return nil, fmt.Errorf("empty token")
 	}
-	return nil, fmt.Errorf("oidc validation not yet implemented")
+
+	parsed, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
+
+		kid, ok := t.Header["kid"].(string)
+		if !ok || kid == "" {
+			return nil, fmt.Errorf("token missing kid header")
+		}
+
+		return v.getKey(kid)
+	},
+		jwt.WithIssuer(v.issuerURL),
+		jwt.WithAudience(v.clientID),
+		jwt.WithValidMethods([]string{"RS256", "RS384", "RS512"}),
+		jwt.WithLeeway(30*time.Second),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("token validation failed: %w", err)
+	}
+
+	rawClaims, ok := parsed.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, fmt.Errorf("invalid claims format")
+	}
+
+	claims := &TokenClaims{
+		Subject: safeString(rawClaims["sub"]),
+		Email:   safeString(rawClaims["email"]),
+		Name:    safeString(rawClaims["name"]),
+		TeamID:  safeString(rawClaims["team_id"]),
+	}
+
+	if exp, ok := rawClaims["exp"].(float64); ok {
+		claims.Exp = int64(exp)
+	}
+
+	if rolesRaw, ok := rawClaims["roles"].([]interface{}); ok {
+		claims.Roles = make([]string, 0, len(rolesRaw))
+		for _, r := range rolesRaw {
+			if s, ok := r.(string); ok {
+				claims.Roles = append(claims.Roles, s)
+			}
+		}
+	}
+
+	if claims.Roles == nil {
+		if groupsRaw, ok := rawClaims["groups"].([]interface{}); ok {
+			claims.Roles = make([]string, 0, len(groupsRaw))
+			for _, g := range groupsRaw {
+				if s, ok := g.(string); ok {
+					claims.Roles = append(claims.Roles, s)
+				}
+			}
+		}
+	}
+
+	if claims.Roles == nil {
+		claims.Roles = []string{RoleViewer}
+	}
+
+	return claims, nil
 }
 
-// ExtractSubjectFromBearer extracts the subject from a Bearer token in the Authorization header.
+func safeString(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	s, ok := v.(string)
+	if !ok {
+		return ""
+	}
+	return s
+}
+
+var globalValidateToken = defaultValidateToken
+
+func defaultValidateToken(tokenString string) (*TokenClaims, error) {
+	defaultValidatorMu.Lock()
+	v := defaultValidator
+	defaultValidatorMu.Unlock()
+
+	if v == nil {
+		return nil, fmt.Errorf("OIDC validator not initialized: call InitDefaultValidator or set SENTINEL_OIDC_ISSUER_URL and SENTINEL_OIDC_CLIENT_ID")
+	}
+
+	return v.ValidateToken(tokenString)
+}
+
+func ValidateToken(tokenString string) (*TokenClaims, error) {
+	return globalValidateToken(tokenString)
+}
+
 func ExtractSubjectFromBearer(r *http.Request) string {
 	auth := r.Header.Get("Authorization")
 	if !strings.HasPrefix(auth, "Bearer ") {
@@ -210,7 +469,6 @@ func ExtractSubjectFromBearer(r *http.Request) string {
 	return claims.Subject
 }
 
-// Context keys for storing auth info in request context.
 type contextKey string
 
 const (
@@ -219,12 +477,10 @@ const (
 	SubjectKey contextKey = "subject"
 )
 
-// WithUser stores a user in context.
 func WithUser(ctx context.Context, user *User) context.Context {
 	return context.WithValue(ctx, UserKey, user)
 }
 
-// UserFromContext retrieves a user from context.
 func UserFromContext(ctx context.Context) (*User, bool) {
 	user, ok := ctx.Value(UserKey).(*User)
 	return user, ok
