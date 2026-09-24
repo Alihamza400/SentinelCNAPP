@@ -64,11 +64,68 @@ static_resources:
                     context_extensions:
                       resource: /assets
 
-            # Finding API (Phase 3)
+            # Correlation: findings + dashboard + graph
             - match:
                 prefix: /api/v1/findings
               route:
                 cluster: correlation
+                timeout: 30s
+            - match:
+                prefix: /api/v1/dashboard
+              route:
+                cluster: correlation
+                timeout: 30s
+            - match:
+                prefix: /api/v1/graph
+              route:
+                cluster: correlation
+                timeout: 30s
+
+            # Attack path analysis
+            - match:
+                prefix: /api/v1/attack-paths
+              route:
+                cluster: attack-path
+                timeout: 30s
+
+            # Risk engine
+            - match:
+                prefix: /api/v1/risk
+              route:
+                cluster: risk-engine
+                timeout: 30s
+
+            # Remediation workflow
+            - match:
+                prefix: /api/v1/remediation
+              route:
+                cluster: remediation
+                timeout: 30s
+
+            # AI assistant
+            - match:
+                prefix: /api/v1/ai
+              route:
+                cluster: ai-assistant
+                timeout: 30s
+
+            # Runtime protection
+            - match:
+                prefix: /api/v1/runtime
+              route:
+                cluster: runtime
+                timeout: 30s
+
+            # Scanner fan-out (dev-gateway selects via X-Scanner header)
+            - match:
+                prefix: /api/v1/scan
+              route:
+                cluster: scanner-iac
+                timeout: 120s
+            - match:
+                prefix: /webhook
+              route:
+                cluster: scanner-iac
                 timeout: 30s
 
             # Health check (no auth)
@@ -125,6 +182,90 @@ static_resources:
         thresholds:
           - priority: DEFAULT
             max_retries: 3
+
+    - name: attack-path
+      connect_timeout: 5s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: attack-path
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: attack-path
+                      port_value: 8080
+
+    - name: risk-engine
+      connect_timeout: 5s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: risk-engine
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: risk-engine
+                      port_value: 8080
+
+    - name: remediation
+      connect_timeout: 5s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: remediation
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: remediation
+                      port_value: 8080
+
+    - name: ai-assistant
+      connect_timeout: 5s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: ai-assistant
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: ai-assistant
+                      port_value: 8080
+
+    - name: runtime
+      connect_timeout: 5s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: runtime
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: runtime
+                      port_value: 8080
+
+    - name: scanner-iac
+      connect_timeout: 5s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: scanner-iac
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: scanner-iac
+                      port_value: 8080
 
     - name: ext_authz
       connect_timeout: 0.25s
