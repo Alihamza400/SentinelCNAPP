@@ -34,19 +34,19 @@ func NewWithDriver(driver neo4j.DriverWithContext) *Client {
 }
 
 // Write executes a write transaction.
-func (c *Client) Write(ctx context.Context, query string, params map[string]any) (neo4j.ResultWithContext, error) {
+//
+// The transaction is committed before returning; any result cursor produced by
+// the query is closed with it, so only the error is surfaced to callers.
+func (c *Client) Write(ctx context.Context, query string, params map[string]any) error {
 	session := c.driver.NewSession(ctx, neo4j.SessionConfig{
 		AccessMode: neo4j.AccessModeWrite,
 	})
 	defer session.Close(ctx)
 
-	return session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-		result, err := tx.Run(ctx, query, params)
-		if err != nil {
-			return nil, err
-		}
-		return result, nil
+	_, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		return tx.Run(ctx, query, params)
 	})
+	return err
 }
 
 // Read executes a read transaction.

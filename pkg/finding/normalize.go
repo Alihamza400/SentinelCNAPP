@@ -27,32 +27,41 @@ func NewFindingID(source Source, assetID, title string) string {
 	return generateID(source, assetID, title)
 }
 
-// NormalizeSeverity maps various severity strings to our standard set.
-func NormalizeSeverity(raw string) Severity {
-	lower := strings.ToLower(raw)
-	switch lower {
-	case "critical", "cr", "4", "5":
-		return SeverityCritical
-	case "high", "h", "3":
-		return SeverityHigh
-	case "medium", "med", "m", "2":
-		return SeverityMedium
-	case "low", "l", "1":
-		return SeverityLow
-	case "info", "informational", "i", "0":
-		return SeverityInfo
-	default:
-		return SeverityInfo
-	}
+// severityAliases maps the raw severity strings emitted by the various
+// scanners (Trivy, Checkov, Gitleaks, Falco) onto our standard set.
+var severityAliases = map[string]Severity{
+	"critical":      SeverityCritical,
+	"cr":            SeverityCritical,
+	"4":             SeverityCritical,
+	"5":             SeverityCritical,
+	"high":          SeverityHigh,
+	"h":             SeverityHigh,
+	"3":             SeverityHigh,
+	"medium":        SeverityMedium,
+	"med":           SeverityMedium,
+	"m":             SeverityMedium,
+	"2":             SeverityMedium,
+	"low":           SeverityLow,
+	"l":             SeverityLow,
+	"1":             SeverityLow,
+	"info":          SeverityInfo,
+	"informational": SeverityInfo,
+	"i":             SeverityInfo,
+	"0":             SeverityInfo,
 }
 
-// ParseSeverity parses a severity string into the Severity type.
-func ParseSeverity(s string) (Severity, bool) {
-	normalized := NormalizeSeverity(s)
-	switch normalized {
-	case SeverityCritical, SeverityHigh, SeverityMedium, SeverityLow, SeverityInfo:
-		return normalized, true
-	default:
-		return "", false
+// NormalizeSeverity maps various severity strings to our standard set,
+// falling back to SeverityInfo for unrecognized input.
+func NormalizeSeverity(raw string) Severity {
+	if sev, ok := severityAliases[strings.ToLower(strings.TrimSpace(raw))]; ok {
+		return sev
 	}
+	return SeverityInfo
+}
+
+// ParseSeverity parses a severity string into the Severity type, reporting
+// false when the input does not name a known severity.
+func ParseSeverity(s string) (Severity, bool) {
+	sev, ok := severityAliases[strings.ToLower(strings.TrimSpace(s))]
+	return sev, ok
 }

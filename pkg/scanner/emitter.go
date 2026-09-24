@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/sentinel-cnapp/sentinel-cnapp/pkg/finding"
@@ -9,6 +10,9 @@ import (
 	"github.com/sentinel-cnapp/sentinel-cnapp/pkg/metrics"
 	"github.com/sentinel-cnapp/sentinel-cnapp/pkg/queue"
 )
+
+// ErrPartialEmit is returned when a batch emit completed with some failures.
+var ErrPartialEmit = errors.New("scanner: partial emit, some findings could not be published")
 
 // Emitter publishes normalized findings to the event bus.
 type Emitter struct {
