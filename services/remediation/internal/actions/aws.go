@@ -166,7 +166,7 @@ func (e *AWSExecutor) EnableECRScanOnPush(ctx context.Context, repoARN string) (
 	_, err := e.ecrClient.PutImageScanningConfiguration(ctx, &ecr.PutImageScanningConfigurationInput{
 		RepositoryName: &repoName,
 		ImageScanningConfiguration: &ecrTypes.ImageScanningConfiguration{
-			ScanOnPush: aws.Bool(true),
+			ScanOnPush: true,
 		},
 	})
 	if err != nil {

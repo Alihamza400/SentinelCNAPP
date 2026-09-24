@@ -302,7 +302,7 @@ func (e *Engine) writeRiskToGraph(ctx context.Context, findingID string, eval *R
 		factorJSON += fmt.Sprintf("%s:%.1f", f.Name, f.Score)
 	}
 
-	_, err := e.client.Write(ctx, queryWriteRiskScore, map[string]any{
+	err := e.client.Write(ctx, queryWriteRiskScore, map[string]any{
 		"finding_id":   findingID,
 		"risk_score":   eval.OverallScore,
 		"risk_factors": factorJSON,

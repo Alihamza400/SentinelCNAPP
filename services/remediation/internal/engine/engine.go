@@ -90,10 +90,14 @@ func (e *Engine) SuggestRemediation(ctx context.Context, findingID string) ([]*R
 	// Determine remediation actions based on finding source + asset type
 	remediations := e.determineActions(findingID, severity, source, assetType, assetID)
 
-	// Auto-remediate low-severity findings
 	for _, r := range remediations {
+		// Auto-remediate low-severity findings
 		if severity == "low" || severity == "info" {
 			r.AutoRemediate = true
+		}
+		// Persist new suggestions so they show up as pending approvals.
+		if _, exists := e.remediations[r.ID]; !exists {
+			e.remediations[r.ID] = r
 		}
 	}
 

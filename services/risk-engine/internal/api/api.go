@@ -3,7 +3,8 @@ package api
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/sentinel-cnapp/sentinel-cnapp/pkg/logging"
@@ -26,7 +27,9 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v1/risk/evaluate", s.EvaluateFinding)
 	mux.HandleFunc("POST /api/v1/risk/evaluate-all", s.EvaluateAll)
-	mux.HandleFunc("GET /api/v1/risk/{finding_id}", s.GetRisk)
+	// Prefix match: finding IDs contain "/" (e.g. gitleaks:git:github.com/org/repo:...)
+	// so a single-segment {finding_id} wildcard cannot capture them.
+	mux.HandleFunc("GET /api/v1/risk/", s.GetRisk)
 	return mux
 }
 
@@ -80,9 +83,9 @@ func (s *Server) EvaluateAll(w http.ResponseWriter, r *http.Request) {
 		"duration", time.Since(start))
 }
 
-// GetRisk handles GET /api/v1/risk/{finding_id}
+// GetRisk handles GET /api/v1/risk/{finding_id...}
 func (s *Server) GetRisk(w http.ResponseWriter, r *http.Request) {
-	findingID := r.PathValue("finding_id")
+	findingID := pathRest(r.URL.Path, "/api/v1/risk/")
 	if findingID == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "finding_id required"})
 		return
@@ -101,4 +104,16 @@ func writeJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(data)
+}
+
+// pathRest returns the portion of the path after prefix (unescaped).
+func pathRest(full, prefix string) string {
+	p := strings.TrimPrefix(full, prefix)
+	if p == full {
+		return ""
+	}
+	if unescaped, err := url.PathUnescape(p); err == nil {
+		return unescaped
+	}
+	return p
 }

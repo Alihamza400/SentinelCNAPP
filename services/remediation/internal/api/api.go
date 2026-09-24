@@ -3,6 +3,8 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/sentinel-cnapp/sentinel-cnapp/pkg/logging"
 	"github.com/sentinel-cnapp/sentinel-cnapp/services/remediation/internal/engine"
@@ -20,19 +22,21 @@ func NewServer(eng *engine.Engine, log *logging.Logger) *Server {
 }
 
 // Handler returns an HTTP handler with remediation routes.
+// Finding IDs may contain "/" (e.g. gitleaks:git:github.com/org/repo:...), so
+// path params use prefix matching instead of single-segment {id} wildcards.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/v1/remediation/suggest/{finding_id}", s.Suggest)
-	mux.HandleFunc("POST /api/v1/remediation/approve/{remediation_id}", s.Approve)
+	mux.HandleFunc("GET /api/v1/remediation/suggest/", s.Suggest)
+	mux.HandleFunc("POST /api/v1/remediation/approve/", s.Approve)
 	mux.HandleFunc("GET /api/v1/remediation/pending", s.Pending)
-	mux.HandleFunc("GET /api/v1/remediation/finding/{finding_id}", s.ListByFinding)
+	mux.HandleFunc("GET /api/v1/remediation/finding/", s.ListByFinding)
 	mux.HandleFunc("POST /api/v1/remediation/auto-execute", s.AutoExecute)
 	return mux
 }
 
 // Suggest handles GET /api/v1/remediation/suggest/{finding_id}
 func (s *Server) Suggest(w http.ResponseWriter, r *http.Request) {
-	findingID := r.PathValue("finding_id")
+	findingID := pathRest(r.URL.Path, "/api/v1/remediation/suggest/")
 	if findingID == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "finding_id required"})
 		return
@@ -54,7 +58,7 @@ func (s *Server) Suggest(w http.ResponseWriter, r *http.Request) {
 
 // Approve handles POST /api/v1/remediation/approve/{remediation_id}
 func (s *Server) Approve(w http.ResponseWriter, r *http.Request) {
-	remediationID := r.PathValue("remediation_id")
+	remediationID := pathRest(r.URL.Path, "/api/v1/remediation/approve/")
 	if remediationID == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "remediation_id required"})
 		return
@@ -91,7 +95,7 @@ func (s *Server) Pending(w http.ResponseWriter, r *http.Request) {
 
 // ListByFinding handles GET /api/v1/remediation/finding/{finding_id}
 func (s *Server) ListByFinding(w http.ResponseWriter, r *http.Request) {
-	findingID := r.PathValue("finding_id")
+	findingID := pathRest(r.URL.Path, "/api/v1/remediation/finding/")
 	if findingID == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "finding_id required"})
 		return
@@ -124,4 +128,16 @@ func writeJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(data)
+}
+
+// pathRest returns the portion of the path after prefix (unescaped).
+func pathRest(full, prefix string) string {
+	p := strings.TrimPrefix(full, prefix)
+	if p == full {
+		return ""
+	}
+	if unescaped, err := url.PathUnescape(p); err == nil {
+		return unescaped
+	}
+	return p
 }

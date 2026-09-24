@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/config"
+	awscfg "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/sentinel-cnapp/sentinel-cnapp/pkg/config"
 	"github.com/sentinel-cnapp/sentinel-cnapp/pkg/graph"
 	"github.com/sentinel-cnapp/sentinel-cnapp/pkg/logging"
@@ -71,7 +71,7 @@ func run(ctx context.Context) error {
 	defer natsQueue.Close()
 
 	// ── AWS Config ─────────────────────────────────────────
-	awsCfg, err := config.LoadDefaultConfig(ctx)
+	awsCfg, err := awscfg.LoadDefaultConfig(ctx)
 	if err != nil {
 		log.Warn("aws config not available, running in dry-run mode", "error", err)
 	}
