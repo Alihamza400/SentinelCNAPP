@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useAuth } from '@/components/auth-provider';
+import { RequireAuth } from '@/components/require-auth';
 import { API_URL } from '@/lib/config';
 import { Share2, ZoomIn, ZoomOut, RotateCw } from 'lucide-react';
 
@@ -65,7 +66,7 @@ function getNodeLabel(node: GraphNode): string {
   return node.id.substring(0, 20);
 }
 
-export default function GraphPage() {
+function GraphContent() {
   const { isAuthenticated } = useAuth();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [graphData, setGraphData] = useState<GraphData | null>(null);
@@ -480,4 +481,12 @@ function getMockGraphData(): GraphData {
       { source: 'identity-1', target: 'arn:aws:s3:::checkout-logs', type: 'CAN_ACCESS' },
     ],
   };
+}
+
+export default function GraphPage() {
+  return (
+    <RequireAuth>
+      <GraphContent />
+    </RequireAuth>
+  );
 }

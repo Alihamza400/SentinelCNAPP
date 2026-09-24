@@ -2,6 +2,7 @@
 
 import { Cloud, Search, AlertTriangle, Activity, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/components/auth-provider';
+import { RequireAuth } from '@/components/require-auth';
 import { useEffect, useState } from 'react';
 import { listAssets } from '@/lib/api-client';
 import { API_URL } from '@/lib/config';
@@ -30,7 +31,7 @@ const scanners = [
   { name: 'Runtime Protection', engine: 'Falco', status: 'planned', phase: 'Phase 4' },
 ];
 
-export default function Dashboard() {
+function DashboardContent() {
   const { isAuthenticated } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({ total_assets: 0, open_findings: 0, critical_findings: 0 });
   const [severityDist, setSeverityDist] = useState<SeverityDistribution>({});
@@ -177,5 +178,13 @@ export default function Dashboard() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <RequireAuth>
+      <DashboardContent />
+    </RequireAuth>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/components/auth-provider';
+import { RequireAuth } from '@/components/require-auth';
 import { API_URL } from '@/lib/config';
 import { AlertTriangle, Search, Shield, Filter } from 'lucide-react';
 
@@ -41,7 +42,7 @@ const SOURCE_ICONS: Record<string, string> = {
   'k8s-custom': '☸️',
 };
 
-export default function FindingsPage() {
+function FindingsContent() {
   const { isAuthenticated } = useAuth();
   const [findings, setFindings] = useState<Finding[]>([]);
   const [total, setTotal] = useState(0);
@@ -305,4 +306,12 @@ function getMockFindings(): Finding[] {
       detected_at: new Date(Date.now() - 604800000).toISOString(),
     },
   ];
+}
+
+export default function FindingsPage() {
+  return (
+    <RequireAuth>
+      <FindingsContent />
+    </RequireAuth>
+  );
 }

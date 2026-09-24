@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/auth-provider';
+import { RequireAuth } from '@/components/require-auth';
 import { API_URL } from '@/lib/config';
 import { Shield, ShieldAlert, ArrowRight,ExternalLink } from 'lucide-react';
 
@@ -46,7 +47,7 @@ const STEP_ICONS: Record<string, string> = {
   Resource: '🎯',
 };
 
-export default function AttackPathsPage() {
+function AttackPathsContent() {
   const { isAuthenticated } = useAuth();
   const [summary, setSummary] = useState<AttackPathSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -222,4 +223,12 @@ function getMockSummary(): AttackPathSummary {
       },
     ],
   };
+}
+
+export default function AttackPathsPage() {
+  return (
+    <RequireAuth>
+      <AttackPathsContent />
+    </RequireAuth>
+  );
 }

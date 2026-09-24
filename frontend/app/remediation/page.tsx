@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/auth-provider';
+import { RequireAuth } from '@/components/require-auth';
 import { API_URL } from '@/lib/config';
 import { Shield, CheckCircle2, XCircle, Clock, AlertTriangle } from 'lucide-react';
 
@@ -34,7 +35,7 @@ const STATUS_ICONS: Record<string, React.ReactNode> = {
   rejected: <XCircle className="h-4 w-4 text-gray-500" />,
 };
 
-export default function RemediationPage() {
+function RemediationContent() {
   const { isAuthenticated, user } = useAuth();
   const [pending, setPending] = useState<Remediation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -205,3 +206,11 @@ const mockPending: Remediation[] = [
     created_at: new Date().toISOString(),
   },
 ];
+
+export default function RemediationPage() {
+  return (
+    <RequireAuth>
+      <RemediationContent />
+    </RequireAuth>
+  );
+}

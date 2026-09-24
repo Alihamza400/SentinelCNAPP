@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/components/auth-provider';
+import { RequireAuth } from '@/components/require-auth';
 import { API_URL } from '@/lib/config';
 import { Bot, Send, Database, Clock, AlertCircle, Sparkles } from 'lucide-react';
 
@@ -38,7 +39,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   Identity: 'text-violet-500',
 };
 
-export default function AIAssistantPage() {
+function AIAssistantContent() {
   const { isAuthenticated } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: 'assistant', content: 'Hello! I am your security AI assistant. Ask me anything about your cloud security posture, or try one of the example questions below.', timestamp: new Date().toISOString() },
@@ -288,4 +289,12 @@ function formatCellValue(val: any): string {
   if (val === null || val === undefined) return '—';
   if (typeof val === 'object') return JSON.stringify(val).substring(0, 60);
   return String(val).substring(0, 60);
+}
+
+export default function AIAssistantPage() {
+  return (
+    <RequireAuth>
+      <AIAssistantContent />
+    </RequireAuth>
+  );
 }

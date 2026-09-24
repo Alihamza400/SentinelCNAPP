@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/components/auth-provider';
+import { RequireAuth } from '@/components/require-auth';
 import { listAssets, APIError } from '@/lib/api-client';
 import { Cloud, Search, Filter, RefreshCw } from 'lucide-react';
 
@@ -45,7 +46,7 @@ const TYPE_LABELS: Record<string, string> = {
   ebs_volume: 'EBS Volume',
 };
 
-export default function AssetsPage() {
+function AssetsContent() {
   const { isAuthenticated } = useAuth();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [total, setTotal] = useState(0);
@@ -232,5 +233,13 @@ export default function AssetsPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function AssetsPage() {
+  return (
+    <RequireAuth>
+      <AssetsContent />
+    </RequireAuth>
   );
 }
