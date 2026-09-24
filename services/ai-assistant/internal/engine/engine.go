@@ -234,7 +234,8 @@ func extractParams(t QueryTemplate, question string) map[string]any {
 			for i, w := range words {
 				if w == "top" || w == "limit" {
 					if i+1 < len(words) {
-						if n, err := fmt.Sscanf(words[i+1], "%d", &n); err == nil {
+						var n int
+						if _, err := fmt.Sscanf(words[i+1], "%d", &n); err == nil && n > 0 {
 							params["limit"] = n
 						}
 					}

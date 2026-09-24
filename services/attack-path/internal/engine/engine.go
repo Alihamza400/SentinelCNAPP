@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/sentinel-cnapp/sentinel-cnapp/pkg/graph"
 	"github.com/sentinel-cnapp/sentinel-cnapp/pkg/logging"
 )
@@ -163,7 +164,7 @@ func (e *Engine) GetSummary(ctx context.Context) (*Summary, error) {
 	return summary, nil
 }
 
-func (e *Engine) buildPaths(records []interface{ Get(key string) (any, bool) }) []*AttackPath {
+func (e *Engine) buildPaths(records []*neo4j.Record) []*AttackPath {
 	pathMap := make(map[string]*AttackPath)
 
 	for _, rec := range records {
@@ -260,8 +261,13 @@ func getStr(rec interface{ Get(key string) (any, bool) }, key string) string {
 
 func getFloat(rec interface{ Get(key string) (any, bool) }, key string) float64 {
 	if v, ok := rec.Get(key); ok && v != nil {
-		if f, ok := v.(float64); ok {
+		switch f := v.(type) {
+		case float64:
 			return f
+		case int64:
+			return float64(f)
+		case int:
+			return float64(f)
 		}
 	}
 	return 0.0
