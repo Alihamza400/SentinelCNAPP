@@ -131,7 +131,7 @@ const ListFindings = `
 		AND ($search IS NULL OR f.title CONTAINS $search OR f.description CONTAINS $search)
 	OPTIONAL MATCH (f)-[:HAS_RISK]->(r:RiskEvaluation)
 	RETURN f, a.id AS asset_id,
-		r.score AS risk_score
+		COALESCE(r.score, f.risk_score) AS risk_score
 	ORDER BY
 		CASE f.severity
 			WHEN 'critical' THEN 0

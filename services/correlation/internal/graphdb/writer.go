@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
+
 	"github.com/sentinel-cnapp/sentinel-cnapp/pkg/finding"
 	"github.com/sentinel-cnapp/sentinel-cnapp/pkg/graph"
 	"github.com/sentinel-cnapp/sentinel-cnapp/pkg/logging"
@@ -42,7 +43,7 @@ func (w *Writer) WriteAsset(ctx context.Context, data AssetData) error {
 		return fmt.Errorf("marshaling tags: %w", err)
 	}
 
-	_, err = w.client.Write(ctx, MergeAsset, map[string]any{
+	err = w.client.Write(ctx, MergeAsset, map[string]any{
 		"id":              data.ID,
 		"provider":        data.Provider,
 		"type":            data.Type,
@@ -70,7 +71,7 @@ func (w *Writer) WriteFinding(ctx context.Context, f finding.Finding) error {
 		return fmt.Errorf("marshaling tags: %w", err)
 	}
 
-	_, err = w.client.Write(ctx, MergeFinding, map[string]any{
+	err = w.client.Write(ctx, MergeFinding, map[string]any{
 		"id":          f.ID,
 		"source":      string(f.Source),
 		"type":        string(f.Type),
@@ -229,7 +230,10 @@ func (r *Reader) ListFindings(ctx context.Context, severity, source, ftype, stat
 		if !ok {
 			continue
 		}
-		fNodeMap := fNode.(map[string]any)
+		fNodeMap := asPropMap(fNode)
+		if fNodeMap == nil {
+			continue
+		}
 
 		fr := FindingResult{
 			ID:       getStr(fNodeMap, "id"),
@@ -240,11 +244,21 @@ func (r *Reader) ListFindings(ctx context.Context, severity, source, ftype, stat
 			Status:   getStr(fNodeMap, "status"),
 		}
 
-		if aid, ok := rec.Get("asset_id"); ok {
-			fr.AssetID = aid.(string)
+		if aid, ok := rec.Get("asset_id"); ok && aid != nil {
+			if s, ok := aid.(string); ok {
+				fr.AssetID = s
+			}
 		}
 		if rs, ok := rec.Get("risk_score"); ok && rs != nil {
-			fr.RiskScore = rs.(float64)
+			// Neo4j may return float64 or int64 depending on how the value was written.
+			switch v := rs.(type) {
+			case float64:
+				fr.RiskScore = v
+			case int64:
+				fr.RiskScore = float64(v)
+			case int:
+				fr.RiskScore = float64(v)
+			}
 		}
 		if dt, ok := fNodeMap["detected_at"]; ok && dt != nil {
 			fr.DetectedAt = fmt.Sprintf("%v", dt)
@@ -289,7 +303,13 @@ func (r *Reader) GetSeverityDistribution(ctx context.Context) (map[string]int64,
 	}
 	dist := make(map[string]int64)
 	for _, rec := range records {
-		severity := rec.Values[0].(string)
+		if len(rec.Values) < 2 || rec.Values[0] == nil {
+			continue
+		}
+		severity, ok := rec.Values[0].(string)
+		if !ok || severity == "" {
+			continue
+		}
 		count := toInt64(rec.Values[1])
 		dist[severity] = count
 	}
@@ -340,9 +360,15 @@ func (r *Reader) GetGraphData(ctx context.Context, limit int) (*GraphData, error
 		if !ok {
 			continue
 		}
-		nodeMap := node.(map[string]any)
+		nodeMap := asPropMap(node)
+		if nodeMap == nil {
+			continue
+		}
 
 		nodeID := getStr(nodeMap, "id")
+		if nodeID == "" {
+			continue
+		}
 		if !seenNodes[nodeID] {
 			seenNodes[nodeID] = true
 			data.Nodes = append(data.Nodes, nodeMap)
@@ -350,10 +376,22 @@ func (r *Reader) GetGraphData(ctx context.Context, limit int) (*GraphData, error
 
 		connected, ok := rec.Get("connected")
 		if ok && connected != nil {
-			connectedList := connected.([]any)
+			connectedList, ok := connected.([]any)
+			if !ok {
+				continue
+			}
 			for _, c := range connectedList {
-				cn := c.(map[string]any)
+				cn := asPropMap(c)
+				if cn == nil {
+					continue
+				}
 				cnID := getStr(cn, "id")
+				// OPTIONAL MATCH produces null-id placeholders when an asset has
+				// no findings or identities — skip them instead of emitting
+				// bogus edges to "".
+				if cnID == "" {
+					continue
+				}
 				if !seenNodes[cnID] {
 					seenNodes[cnID] = true
 					data.Nodes = append(data.Nodes, cn)
@@ -372,22 +410,69 @@ func (r *Reader) GetGraphData(ctx context.Context, limit int) (*GraphData, error
 }
 
 func determineEdgeType(node map[string]any) string {
-	labels, ok := node["labels"].([]any)
-	if !ok || len(labels) == 0 {
+	raw, ok := node["labels"]
+	if !ok || raw == nil {
 		return "RELATED_TO"
 	}
-	label := labels[0].(string)
-	switch label {
-	case "Finding":
-		return "FOUND_IN"
-	case "Identity":
-		return "HAS_IDENTITY"
-	default:
-		return "RELATED_TO"
+	switch labels := raw.(type) {
+	case []any:
+		if len(labels) == 0 {
+			return "RELATED_TO"
+		}
+		if label, ok := labels[0].(string); ok {
+			switch label {
+			case "Finding":
+				return "FOUND_IN"
+			case "Identity":
+				return "HAS_IDENTITY"
+			}
+		}
+	case []string:
+		if len(labels) == 0 {
+			return "RELATED_TO"
+		}
+		switch labels[0] {
+		case "Finding":
+			return "FOUND_IN"
+		case "Identity":
+			return "HAS_IDENTITY"
+		}
 	}
+	return "RELATED_TO"
 }
 
 // ── Helpers ──────────────────────────────────────────────────
+
+// asPropMap normalizes Neo4j record values that represent nodes/maps into a
+// plain map. The driver returns dbtype.Node for node projections (RETURN f),
+// and map[string]any for Cypher map projections (RETURN {…} AS node).
+func asPropMap(v any) map[string]any {
+	switch n := v.(type) {
+	case nil:
+		return nil
+	case map[string]any:
+		return n
+	case dbtype.Node:
+		if n.Props == nil {
+			return map[string]any{}
+		}
+		return n.Props
+	case *dbtype.Node:
+		if n == nil {
+			return nil
+		}
+		if n.Props == nil {
+			return map[string]any{}
+		}
+		return n.Props
+	case dbtype.Relationship:
+		if n.Props == nil {
+			return map[string]any{}
+		}
+		return n.Props
+	}
+	return nil
+}
 
 func nullIfEmpty(s string) any {
 	if s == "" {
