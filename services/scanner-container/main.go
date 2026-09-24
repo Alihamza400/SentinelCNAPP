@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -284,4 +283,11 @@ func trivyMisconfigToFinding(mis struct {
 		Status:      finding.StatusOpen,
 		Tags:        []string{"container", "misconfiguration", mis.ID},
 	}
+}
+
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }
