@@ -9,12 +9,13 @@ interface GraphNode {
   id: string;
   labels: string[];
   type: string;
-  name: string;
+  name?: string;
   severity?: string;
   title?: string;
   region?: string;
   environment?: string;
   internet_facing?: boolean;
+  asset_id?: string;
 }
 
 interface GraphEdge {
