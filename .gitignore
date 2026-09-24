@@ -4,6 +4,7 @@ node_modules/
 .next/
 
 # Build output
+/bin/
 *.exe
 *.exe~
 *.dll

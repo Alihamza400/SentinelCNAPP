@@ -1,0 +1,18 @@
+# Local development overrides — remaps host ports that may already be in use
+# on developer machines (postgres 5432, redis 6379) and skips OpenSearch.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
+#   (or simply: ./scripts/dev-up.sh)
+services:
+  postgres:
+    ports: !override
+      - "5434:5432"
+
+  redis:
+    ports: !override
+      - "6381:6379"
+
+  opensearch:
+    profiles:
+      - search
