@@ -2,12 +2,12 @@ package discovery
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
+	lambdaTypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 
 	"github.com/sentinel-cnapp/sentinel-cnapp/services/asset-inventory/internal/store"
 )
@@ -48,23 +48,23 @@ func (d *LambdaDiscoverer) Discover(ctx context.Context, region string) ([]store
 	return assets, nil
 }
 
-func (d *LambdaDiscoverer) functionToAsset(fn lambda.FunctionConfiguration, region string) store.Asset {
-	id := fmt.Sprintf("arn:aws:lambda:%s:%s:function:%s", region, d.accountID, *fn.FunctionName)
+func (d *LambdaDiscoverer) functionToAsset(fn lambdaTypes.FunctionConfiguration, region string) store.Asset {
+	id := fmt.Sprintf("arn:aws:lambda:%s:%s:function:%s", region, d.accountID, aws.ToString(fn.FunctionName))
 	tags := make(map[string]string)
 
 	runtime := ""
-	if fn.Runtime != nil {
+	if fn.Runtime != "" {
 		runtime = string(fn.Runtime)
 	}
 
 	metadata := map[string]string{
-		"runtime":        runtime,
-		"handler":        safeString(fn.Handler),
-		"memory":         fmt.Sprintf("%d", aws.ToInt32(fn.MemorySize)),
-		"timeout":        fmt.Sprintf("%d", aws.ToInt32(fn.Timeout)),
-		"last_modified":  safeString(fn.LastModified),
-		"code_size":      fmt.Sprintf("%d", aws.ToInt64(fn.CodeSize)),
-		"role":           safeString(fn.Role),
+		"runtime":       runtime,
+		"handler":       safeString(fn.Handler),
+		"memory":        fmt.Sprintf("%d", aws.ToInt32(fn.MemorySize)),
+		"timeout":       fmt.Sprintf("%d", aws.ToInt32(fn.Timeout)),
+		"last_modified": safeString(fn.LastModified),
+		"code_size":     fmt.Sprintf("%d", fn.CodeSize),
+		"role":          safeString(fn.Role),
 	}
 
 	// Check if Lambda has a VPC config (internet access)
@@ -80,7 +80,7 @@ func (d *LambdaDiscoverer) functionToAsset(fn lambda.FunctionConfiguration, regi
 		ID:           id,
 		Provider:     "aws",
 		AssetType:    "lambda_function",
-		Name:         *fn.FunctionName,
+		Name:         aws.ToString(fn.FunctionName),
 		Region:       region,
 		Tags:         tags,
 		MetadataJSON: metadataJSON,

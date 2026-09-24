@@ -20,6 +20,7 @@ func Migrations() []Migration {
 			Name:    "create_assets_table",
 			SQL: `
 				CREATE EXTENSION IF NOT EXISTS pgcrypto;
+				CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 				CREATE TABLE IF NOT EXISTS assets (
 					id              TEXT PRIMARY KEY,

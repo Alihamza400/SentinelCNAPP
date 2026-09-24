@@ -7,6 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
+	ecrTypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 
 	"github.com/sentinel-cnapp/sentinel-cnapp/services/asset-inventory/internal/store"
 )
@@ -39,7 +40,7 @@ func (d *ECRDiscoverer) Discover(ctx context.Context, region string) ([]store.As
 		}
 
 		for _, repo := range output.Repositories {
-			asset := d.repoToAsset(repo, region)
+			asset := d.repoToAsset(ctx, repo, region)
 			assets = append(assets, asset)
 		}
 	}
@@ -47,20 +48,34 @@ func (d *ECRDiscoverer) Discover(ctx context.Context, region string) ([]store.As
 	return assets, nil
 }
 
-func (d *ECRDiscoverer) repoToAsset(repo ecr.Repository, region string) store.Asset {
-	id := fmt.Sprintf("arn:aws:ecr:%s:%s:repository/%s", region, d.accountID, *repo.RepositoryName)
-	tags := awsTagsToMap(repo.Tags)
+func (d *ECRDiscoverer) repoToAsset(ctx context.Context, repo ecrTypes.Repository, region string) store.Asset {
+	id := fmt.Sprintf("arn:aws:ecr:%s:%s:repository/%s", region, d.accountID, aws.ToString(repo.RepositoryName))
+
+	// ECR DescribeRepositories does not include tags; fetch them separately.
+	tags := make(map[string]string)
+	if repo.RepositoryArn != nil {
+		if tagOut, err := d.client.ListTagsForResource(ctx, &ecr.ListTagsForResourceInput{
+			ResourceArn: repo.RepositoryArn,
+		}); err == nil {
+			tags = ecrTagsToMap(tagOut.Tags)
+		}
+	}
+
+	createdAt := ""
+	if repo.CreatedAt != nil {
+		createdAt = repo.CreatedAt.Format(time.RFC3339)
+	}
 
 	metadata := map[string]string{
-		"repository_uri": safeString(repo.RepositoryUri),
-		"arn":            safeString(repo.RepositoryArn),
-		"created_at":     repo.CreatedAt.Format(time.RFC3339),
-		"image_tag_mutability": string(repo.ImageTagMutability),
-		"scan_on_push":   fmt.Sprintf("%t", repo.ImageScanningConfiguration != nil && repo.ImageScanningConfiguration.ScanOnPush),
+		"repository_uri":        safeString(repo.RepositoryUri),
+		"arn":                   safeString(repo.RepositoryArn),
+		"created_at":            createdAt,
+		"image_tag_mutability":  string(repo.ImageTagMutability),
+		"scan_on_push":          fmt.Sprintf("%t", repo.ImageScanningConfiguration != nil && repo.ImageScanningConfiguration.ScanOnPush),
 	}
 	metadataJSON := marshalMetadata(metadata)
 
-	// Check if repository is publicly accessible (via policy)
+	// Check if repository has a policy that could expose it publicly.
 	internetFacing := false
 	policyResult, err := d.client.GetRepositoryPolicy(ctx, &ecr.GetRepositoryPolicyInput{
 		RepositoryName: repo.RepositoryName,
@@ -74,7 +89,7 @@ func (d *ECRDiscoverer) repoToAsset(repo ecr.Repository, region string) store.As
 		ID:             id,
 		Provider:       "aws",
 		AssetType:      "ecr_repository",
-		Name:           *repo.RepositoryName,
+		Name:           aws.ToString(repo.RepositoryName),
 		Region:         region,
 		Tags:           tags,
 		MetadataJSON:   metadataJSON,

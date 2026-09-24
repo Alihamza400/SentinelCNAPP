@@ -49,7 +49,7 @@ func (d *RDSDiscoverer) Discover(ctx context.Context, region string) ([]store.As
 }
 
 func (d *RDSDiscoverer) instanceToAsset(db rdsTypes.DBInstance, region string) store.Asset {
-	id := fmt.Sprintf("arn:aws:rds:%s:%s:db:%s", region, d.accountID, *db.DBInstanceIdentifier)
+	id := fmt.Sprintf("arn:aws:rds:%s:%s:db:%s", region, d.accountID, aws.ToString(db.DBInstanceIdentifier))
 	tags := rdsTagsToMap(db.TagList)
 
 	// Check if publicly accessible
@@ -63,15 +63,25 @@ func (d *RDSDiscoverer) instanceToAsset(db rdsTypes.DBInstance, region string) s
 		engine = *db.Engine
 	}
 
+	endpoint := ""
+	if db.Endpoint != nil {
+		endpoint = fmt.Sprintf("%s:%d", safeString(db.Endpoint.Address), aws.ToInt32(db.Endpoint.Port))
+	}
+
+	vpcID := ""
+	if db.DBSubnetGroup != nil {
+		vpcID = safeString(db.DBSubnetGroup.VpcId)
+	}
+
 	metadata := map[string]string{
-		"engine":           engine,
-		"engine_version":   safeString(db.EngineVersion),
-		"instance_class":   safeString(db.DBInstanceClass),
-		"status":           safeString(db.DBInstanceStatus),
-		"endpoint":         fmt.Sprintf("%s:%d", safeString(db.Endpoint.Address), aws.ToInt32(db.Endpoint.Port)),
-		"storage":          fmt.Sprintf("%d", aws.ToInt32(db.AllocatedStorage)),
-		"multi_az":         fmt.Sprintf("%t", aws.ToBool(db.MultiAZ)),
-		"vpc_id":           safeString(db.DBSubnetGroup.VpcId),
+		"engine":         engine,
+		"engine_version": safeString(db.EngineVersion),
+		"instance_class": safeString(db.DBInstanceClass),
+		"status":         safeString(db.DBInstanceStatus),
+		"endpoint":       endpoint,
+		"storage":        fmt.Sprintf("%d", aws.ToInt32(db.AllocatedStorage)),
+		"multi_az":       fmt.Sprintf("%t", aws.ToBool(db.MultiAZ)),
+		"vpc_id":         vpcID,
 	}
 	metadataJSON := marshalMetadata(metadata)
 
@@ -80,7 +90,7 @@ func (d *RDSDiscoverer) instanceToAsset(db rdsTypes.DBInstance, region string) s
 		ID:             id,
 		Provider:       "aws",
 		AssetType:      "rds_instance",
-		Name:           *db.DBInstanceIdentifier,
+		Name:           aws.ToString(db.DBInstanceIdentifier),
 		Region:         region,
 		Tags:           tags,
 		MetadataJSON:   metadataJSON,

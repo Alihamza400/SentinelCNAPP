@@ -10,8 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
+	awscfg "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/sentinel-cnapp/sentinel-cnapp/pkg/config"
 	"github.com/sentinel-cnapp/sentinel-cnapp/pkg/logging"
@@ -67,8 +66,8 @@ func run(ctx context.Context) error {
 
 	// ── AWS SDK ─────────────────────────────────────────────────
 	awsRegion := cfg.GetDefault(config.AWSRegion, "us-east-1")
-	awsCfg, err := config.LoadDefaultConfig(ctx,
-		config.WithRegion(awsRegion),
+	awsCfg, err := awscfg.LoadDefaultConfig(ctx,
+		awscfg.WithRegion(awsRegion),
 	)
 	if err != nil {
 		return fmt.Errorf("loading AWS config: %w", err)

@@ -5,7 +5,9 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+	ecrTypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 	iamTypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	rdsTypes "github.com/aws/aws-sdk-go-v2/service/rds/types"
 	s3Types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
@@ -59,11 +61,20 @@ func s3TagsToMap(tags []s3Types.Tag) map[string]string {
 	return m
 }
 
-// rdsTagsToMap converts RDS tags to a map.
-func rdsTagsToMap(tags []iamTypes.Tag) map[string]string {
+// ecrTagsToMap converts ECR tags to a map.
+func ecrTagsToMap(tags []ecrTypes.Tag) map[string]string {
 	m := make(map[string]string)
 	for _, t := range tags {
-		m[*t.Key] = safeString(t.Value)
+		m[safeString(t.Key)] = safeString(t.Value)
+	}
+	return m
+}
+
+// rdsTagsToMap converts RDS tags to a map.
+func rdsTagsToMap(tags []rdsTypes.Tag) map[string]string {
+	m := make(map[string]string)
+	for _, t := range tags {
+		m[safeString(t.Key)] = safeString(t.Value)
 	}
 	return m
 }
